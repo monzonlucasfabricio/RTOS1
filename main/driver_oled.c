@@ -8,7 +8,10 @@
 #include "driver_oled.h"
 
 
-/* Funcion de secuencia de inicializacion del display */
+/**
+ * @brief Display Init --> Bytes sending to memory on the display chip
+ * @param[in] No params
+ */
 void DisplayInit(void) {
 
 	i2c_config_t i2c_config = {
@@ -141,6 +144,7 @@ void displayclear(void){
 	}
 }
 
+
 /**
  * @brief Welcome message
  * @param[in] no params
@@ -153,6 +157,7 @@ void Display_msj_bienvenida(void) {
 	SetCursor(0,4);
 	OledPrint(text);
 }
+
 
 
 

@@ -29,7 +29,6 @@ extern "C" {
 void DisplayInit(void);
 void displayclear(void);
 void Display_msj_bienvenida(void);
-void Display_msj_fijo(void);
 void SetCursor(uint8_t x, uint8_t y);
 void OledPrint(char *text);
 

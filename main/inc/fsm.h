@@ -26,13 +26,13 @@ typedef enum{
 typedef struct{
 	modo_t modo;
 	estado_relay_t relay;
-	gpio_num_t pin_relay;
+	gpio_num_t gpio_relay;
 	uint16_t temperatura;
+	char *nombre;
 }control_t;
 
-control_t place;
 
-void fsminit(control_t *place)
+void fsminit(control_t *place,uint8_t gpio_relay,char *nombre_lugar);
 void fsmcontrol(control_t *place);
 
 #endif /* MAIN_INC_FSM_H_ */
