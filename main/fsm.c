@@ -10,8 +10,10 @@
 
 char modo_automatico[] = "Modo: Automatico";
 char modo_manual[] = "Modo: Manual";
-char luz_encendida[] = "Luz: Encendida";
-char luz_apagada[] = "Luz: Apagada";
+char luz_encendida[] = "Luz:ON";
+char luz_apagada[] = "Luz:OFF";
+char horario_trabajo[] = "H:Lab.";
+char horario_fueradetrabajo[] = "H:NoLab.";
 char borrarpalabra[] = "                ";
 
 
@@ -23,12 +25,13 @@ char borrarpalabra[] = "                ";
  */
 void fsminit(control_t *place,uint8_t gpio_relay,char *nombre_lugar){
 
-	place -> modo = AUTOMATICO;
-	place -> relay = APAGADO;
+	place -> modo = AUTOMATIC;
+	place -> relay = OFF;
 	place -> gpio_relay = gpio_relay;
 	place -> nombre = nombre_lugar;
 	gpio_set_direction((place -> gpio_relay),GPIO_MODE_OUTPUT);
 	gpio_set_pull_mode((place -> gpio_relay),GPIO_PULLUP_ONLY);
+	place -> timetable = WORK;
 
 	SetCursor(0,0);
 	OledPrint(nombre_lugar);
@@ -42,59 +45,59 @@ void fsmcontrol(control_t *place){
 
 	switch(place -> modo){
 
-	case AUTOMATICO:
+	case AUTOMATIC:
 	{
-		SetCursor(0,5);
+		SetCursor(0,6);
 		OledPrint(borrarpalabra);
 		OledPrint(modo_automatico);
-		switch(place->relay){
-		case APAGADO:
-		{
-			gpio_set_level((place -> gpio_relay), 1);
-			SetCursor(0,7);
-			OledPrint(borrarpalabra);
-			OledPrint(luz_apagada);
-		}
-		break;
-
-		case ENCENDIDO:
-		{
-			gpio_set_level((place -> gpio_relay), 0);
-			SetCursor(0,7);
-			OledPrint(borrarpalabra);
-			OledPrint(luz_encendida);
-		}
-		break;
-		}
 	}
 	break;
 
 	case MANUAL:
 	{
-		SetCursor(0,5);
+		SetCursor(0,6);
 		OledPrint(borrarpalabra);
 		OledPrint(modo_manual);
-		switch(place->relay){
-		case APAGADO:
-		{
-			gpio_set_level((place -> gpio_relay), 1);
-			SetCursor(0,7);
-			OledPrint(borrarpalabra);
-			OledPrint(luz_apagada);
-		}
-		break;
+	}
+	break;
+	}
 
-		case ENCENDIDO:
-		{
-			gpio_set_level((place -> gpio_relay), 0);
-			SetCursor(0,7);
-			OledPrint(borrarpalabra);
-			OledPrint(luz_encendida);
-		}
-		break;
-		}
+
+	switch(place->relay){
+	case OFF:
+	{
+		gpio_set_level((place -> gpio_relay), 1);
+		SetCursor(4,4);
+		OledPrint(borrarpalabra);
+		OledPrint(luz_apagada);
 	}
 	break;
 
+	case ON:
+	{
+		gpio_set_level((place -> gpio_relay), 0);
+		SetCursor(4,4);
+		OledPrint(borrarpalabra);
+		OledPrint(luz_encendida);
+	}
+	break;
+	}
+
+
+	switch(place -> timetable){
+	case WORK:
+	{
+		SetCursor(0,4);
+		OledPrint(horario_trabajo);
+	}
+	break;
+
+	case OUTOFWORK:
+	{
+		SetCursor(0,4);
+		OledPrint(horario_fueradetrabajo);
+	}
+	break;
 	}
 }
+

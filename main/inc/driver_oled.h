@@ -25,12 +25,13 @@ extern "C" {
 #define SDA_PIN GPIO_NUM_15
 #define SCL_PIN GPIO_NUM_2
 
-/* Prototipo de funciones globales */
+/* Prototipo de funciones */
 void DisplayInit(void);
-void displayclear(void);
+void Displayclear(void);
 void Display_msj_bienvenida(void);
 void SetCursor(uint8_t x, uint8_t y);
 void OledPrint(char *text);
+void OledPrintByte(uint8_t byte);
 
 #ifdef __cplusplus
 }

@@ -3,6 +3,12 @@
  *
  *  Created on: 21 may. 2020
  *      Author: lucasml
+ *
+ *      The Arduino library is explained in this website
+ *      https://robologs.net/2018/03/11/como-conectar-una-pantalla-oled-ssd1306-con-arduino-sin-libreria/
+ *      If you want to learn about how it works or improve this library please check the website
+ *      This library was written for the ESP32-Wroom-32 module and ESP-IDF API.
+ *
  */
 
 #include "driver_oled.h"
@@ -110,7 +116,7 @@ void OledPrint(char *text){
  * @brief Clear the display screen
  * @param[in] no params
  */
-void displayclear(void){
+void Displayclear(void){
 
 	char text[] = "                ";
 
@@ -153,11 +159,29 @@ void Display_msj_bienvenida(void) {
 
 	char text[] = "----STARTING----";
 
-	displayclear();
+	Displayclear();
 	SetCursor(0,4);
 	OledPrint(text);
 }
 
 
+/**
+ * @brief Send a byte
+ * @param[in] uint8_t byte
+ */
+void OledPrintByte(uint8_t byte){
+
+	uint8_t bytetosend = byte;
+
+	i2c_cmd_handle_t cmd;
+	cmd = i2c_cmd_link_create();
+	i2c_master_start(cmd);
+	i2c_master_write_byte(cmd, (OLED_I2C_ADDRESS << 1) | I2C_MASTER_WRITE, true);
+	i2c_master_write_byte(cmd, OLED_CONTROL_BYTE_DATA_STREAM, true);
+	i2c_master_write(cmd, &bytetosend, sizeof(uint8_t), true);
+	i2c_master_stop(cmd);
+	i2c_master_cmd_begin(I2C_NUM_0, cmd, 1/portTICK_PERIOD_MS);
+	i2c_cmd_link_delete(cmd);
+}
 
 

@@ -24,9 +24,10 @@
 #include "dht.h"
 #include "fsm.h"
 
+
 /* Finite state machine variable creation and name for the place for the device */
-control_t machine;
-char nombre[] = "----OFICINA1----";
+static control_t machine;
+char nombre[] = "----OFICINA2----";
 
 /* Relay pin */
 #define GPIO_NUM_5 5
@@ -44,13 +45,13 @@ static const gpio_num_t dht_gpio = 33;
 /* Queue Handlers */
 static xQueueHandle pulsador1_evt_queue = NULL;
 static xQueueHandle pulsador2_evt_queue = NULL;
-static xQueueHandle temperatura_evt_queue = NULL;
+static xQueueHandle temperature_evt_queue = NULL;
 
 /* Tasks prototypes */
 void gpioInit(void);
 static void pulsador1_isr(void* pvParameter);
 static void pulsador2_isr(void* pvParameter);
-//static void DisplayWrite(void* pvParameter);
+//static void fsmupdate(void* pvParameter);
 static void medicion_temperatura(void* pvParameter);
 
 
@@ -66,20 +67,20 @@ void app_main(void)
 	gpioInit();								//	Interrupt pin initialization
 	Display_msj_bienvenida();				//	Welcome message display on screen
 	vTaskDelay(2000/portTICK_PERIOD_MS);
-	displayclear();
+	Displayclear();
 	fsminit(&machine,GPIO_NUM_5,nombre);
 	fsmcontrol(&machine);
 
 	/* Queue creations */
-	pulsador1_evt_queue = xQueueCreate(1, sizeof(uint32_t));
-	pulsador2_evt_queue = xQueueCreate(1, sizeof(uint32_t));
-	temperatura_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+	pulsador1_evt_queue = xQueueCreate(2, sizeof(uint32_t));
+	pulsador2_evt_queue = xQueueCreate(2, sizeof(uint32_t));
+	temperature_evt_queue = xQueueCreate(2, sizeof(uint32_t));
 
 	/* Task creations */
-	//xTaskCreate(&DisplayWrite,"DisplayWrite",4096,NULL,10,NULL);
-	xTaskCreate(&pulsador1_isr,"pulsador1_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,12,NULL);
-	xTaskCreate(&pulsador2_isr,"pulsador2_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,12,NULL);
-	xTaskCreate(&medicion_temperatura,"medicion_temperatura",configMINIMAL_STACK_SIZE*3,NULL,8,NULL);
+	//xTaskCreate(&fsmupdate,"fsmupdate",configMINIMAL_STACK_SIZE*4,(void*)&machine,10,NULL);
+	xTaskCreate(&pulsador1_isr,"pulsador1_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,3,NULL);
+	xTaskCreate(&pulsador2_isr,"pulsador2_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,1,NULL);
+	xTaskCreate(&medicion_temperatura,"medicion_temperatura",configMINIMAL_STACK_SIZE*3,NULL,2,NULL);
 
 	/* ISR service install for the interrupts */
 	gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
@@ -97,26 +98,21 @@ void app_main(void)
 static void pulsador1_isr(void* pvParameter){
 
 	uint32_t io_num;
-	uint8_t count = 0;
-	control_t machine = *((control_t *) pvParameter);
+	static uint8_t count = 0;
+	control_t *machine = pvParameter;
 
 	while(1){
-
 		if(xQueueReceive(pulsador1_evt_queue, &io_num, portMAX_DELAY)) {
-
-			/* Cambiar estado del relay */
-			if(count == 0){
-				machine.relay = ENCENDIDO;
-			}
-			if(count == 1){
-				machine.relay = APAGADO;
-			}
 			count++;
-
-			if(count == 2){
-				count = 0;
+			if(machine -> relay == ON && count != 2 && count != 0){
+					machine -> relay = OFF;
+					count = 0;
 			}
-			fsmcontrol(&machine);
+			else if(machine -> relay == OFF && count != 2 && count != 0){
+					machine -> relay = ON;
+					count = 0;
+			}
+			fsmcontrol(machine);
 		}
 	}
 }
@@ -125,27 +121,34 @@ static void pulsador1_isr(void* pvParameter){
 
 static void pulsador2_isr(void* pvParameter){
 
-
 	uint32_t io_num;
-	uint8_t count = 0;
-	control_t machine = *((control_t *) pvParameter);
+	static uint8_t count = 0;
+	control_t *machine = pvParameter;
 
 	while(1){
-
 		if(xQueueReceive(pulsador2_evt_queue, &io_num, portMAX_DELAY)) {
-
-			if(count == 0){
-				machine.modo = MANUAL;
-			}
-			if(count == 1){
-				machine.modo = AUTOMATICO;
-			}
 			count++;
-			if(count == 2){
-				count = 0;
+			if(count == 2 && machine -> modo == AUTOMATIC){
+				if(machine -> timetable == WORK){
+					machine -> modo = MANUAL;
+					count = 0;
+				}
+				else if(machine -> timetable == OUTOFWORK){
+					machine -> modo = AUTOMATIC;
+					count = 0;
+				}
 			}
-
-			fsmcontrol(&machine);
+			else if(count == 2 && machine -> modo == MANUAL){
+				if(machine -> timetable == WORK){
+					machine -> modo = AUTOMATIC;
+					count = 0;
+				}
+				else if(machine -> timetable == OUTOFWORK){
+					machine -> modo = AUTOMATIC;
+					count = 0;
+				}
+			}
+			fsmcontrol(machine);
 		}
 	}
 }
@@ -176,21 +179,24 @@ static void medicion_temperatura(void* pvParameter){
 			itoa((humidity/10),valorhum,10);
 			SetCursor(7,2);
 			OledPrint(valorhum);
-
 		}
-		vTaskDelay(2000 / portTICK_PERIOD_MS);
+		vTaskDelay(5000 / portTICK_PERIOD_MS);
 	}
 }
 
 
 
 /* Tarea de Escribir en el display */
-/*static void DisplayWrite(void* pvParameter){
+/*static void fsmupdate(void* pvParameter){
+
+	control_t *machine = pvParameter;
 
 	while(1){
-		if(xQueueReceive(temperatura_evt_queue, &, portMAX_DELAY)){
+		if(xQueueReceive(temperature_evt_queue, &io_num, portMAX_DELAY) == pdTRUE){
 
 		}
+		fsmcontrol(machine);
+		vTaskDelay(1000/portTICK_PERIOD_MS);
 	}
 }
 */

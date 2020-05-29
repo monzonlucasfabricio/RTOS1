@@ -14,14 +14,19 @@
 #include "driver/gpio.h"
 
 typedef enum {
-	AUTOMATICO,
+	AUTOMATIC,
 	MANUAL
 }modo_t;
 
 typedef enum{
-	ENCENDIDO,
-	APAGADO
+	ON,
+	OFF
 }estado_relay_t;
+
+typedef enum{
+	WORK,
+	OUTOFWORK
+}timetable_t;
 
 typedef struct{
 	modo_t modo;
@@ -29,6 +34,7 @@ typedef struct{
 	gpio_num_t gpio_relay;
 	uint16_t temperatura;
 	char *nombre;
+	timetable_t timetable;
 }control_t;
 
 
