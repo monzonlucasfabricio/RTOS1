@@ -9,39 +9,27 @@
 #define MAIN_FONT8X8_BASIC_H_
 
 #include <stdint.h>
+#include <string.h>
 
-/*
-   Constant: font8x8_basic_tr
-   Contains an 90 digree transposed 8x8 font map for unicode points 
-   U+0000 - U+007F (basic latin)
-   
-   To make it easy to use with SSD1306's GDDRAM mapping and API,
-   this constant is an 90 degree transposed.
-   The original version written by Marcel Sondaar is availble at:
-   https://github.com/dhepper/font8x8/blob/master/font8x8_basic.h 
+typedef struct {
+	uint8_t FontWidth;    /*!< Font width in pixels */
+	uint8_t FontHeight;   /*!< Font height in pixels */
+	const uint16_t *data; /*!< Pointer to data font data array */
+} FontDef_t;
 
-   Conversion is done via following procedure:
-   
-	for (int code = 0; code < 128; code++) {
-		uint8_t trans[8];
-		for (int w = 0; w < 8; w++) {
-			trans[w] = 0x00;
-			for (int b = 0; b < 8; b++) {
-				trans[w] |= ((font8x8_basic[code][b] & (1 << w)) >> w) << b;
-			}
-		}
-	
-		for (int w = 0; w < 8; w++) {
-			if (w == 0) { printf("    { "); }
-			printf("0x%.2X", trans[w]);
-			if (w < 7) { printf(", "); }
-			if (w == 7) { printf(" },   // U+00%.2X (%c)\n", code, code); }
-		}
-	}
-*/
+typedef struct {
+	uint16_t Length;      /*!< String length in units of pixels */
+	uint16_t Height;      /*!< String height in units of pixels */
+} FONTS_SIZE_t;
 
-uint8_t font8x8_basic_tr[128][8];
 
+extern FontDef_t Font_7x10;
+
+extern FontDef_t Font_11x18;
+
+extern FontDef_t Font_16x26;
+
+char* FONTS_GetStringSize(char* str, FONTS_SIZE_t* SizeStruct, FontDef_t* Font);
 
 #endif /* MAIN_FONT8X8_BASIC_H_ */
 

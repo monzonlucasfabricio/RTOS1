@@ -6,6 +6,7 @@
    software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
    CONDITIONS OF ANY KIND, either express or implied.
 */
+#include "driver_oled.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -14,19 +15,22 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/queue.h"
 #include "freertos/task.h"
-#include "ssd1366.h"
 #include "driver/gpio.h"
 #include "sdkconfig.h"
 #include "driver/i2c.h"
 #include "esp_err.h"
 #include "esp_log.h"
-#include "driver_oled.h"
 #include "dht.h"
 #include "fsm.h"
 
+/* Struct for dht11 sensor */
+typedef struct {
+	int16_t temperatura;
+	int16_t humedad;
+}hum_temp;
 
 /* Finite state machine variable creation and name for the place for the device */
-static control_t machine;
+control_t machine;
 char nombre[] = "----OFICINA2----";
 
 /* Relay pin */
@@ -49,37 +53,40 @@ static xQueueHandle temperature_evt_queue = NULL;
 
 /* Tasks prototypes */
 void gpioInit(void);
-static void pulsador1_isr(void* pvParameter);
-static void pulsador2_isr(void* pvParameter);
-//static void fsmupdate(void* pvParameter);
-static void medicion_temperatura(void* pvParameter);
-
+void pulsador1_isr(void* pvParameter);
+void pulsador2_isr(void* pvParameter);
+void DisplayWrite(void* pvParameter);
+void medicion_temperatura(void* pvParameter);
 
 /* Synchronization tasks prototypes */
-static void IRAM_ATTR gpio_isr_handler1(void* pvParameter);
-static void IRAM_ATTR gpio_isr_handler2(void* pvParameter);
-
+void IRAM_ATTR gpio_isr_handler1(void* pvParameter);
+void IRAM_ATTR gpio_isr_handler2(void* pvParameter);
 
 void app_main(void)
 {
 	/* Display, GPIO, Finite state machine initialization and welcome message */
-	DisplayInit();
+	SSD1306_DisplayInit();
+	SSD1306_DisplayClear();
 	gpioInit();								//	Interrupt pin initialization
-	Display_msj_bienvenida();				//	Welcome message display on screen
+
+	SSD1306_GotoXY (0, 32);
+	SSD1306_Puts ("----STARTING----", &Font_7x10, 1);
+	SSD1306_UpdateScreen();
+
 	vTaskDelay(2000/portTICK_PERIOD_MS);
-	Displayclear();
+	SSD1306_DisplayClear();
 	fsminit(&machine,GPIO_NUM_5,nombre);
 	fsmcontrol(&machine);
 
 	/* Queue creations */
-	pulsador1_evt_queue = xQueueCreate(2, sizeof(uint32_t));
-	pulsador2_evt_queue = xQueueCreate(2, sizeof(uint32_t));
-	temperature_evt_queue = xQueueCreate(2, sizeof(uint32_t));
+	pulsador1_evt_queue = xQueueCreate(1, sizeof(uint32_t));
+	pulsador2_evt_queue = xQueueCreate(1, sizeof(uint32_t));
+	temperature_evt_queue = xQueueCreate(1, sizeof(hum_temp));
 
 	/* Task creations */
-	//xTaskCreate(&fsmupdate,"fsmupdate",configMINIMAL_STACK_SIZE*4,(void*)&machine,10,NULL);
+	xTaskCreate(&DisplayWrite,"DisplayWrite",configMINIMAL_STACK_SIZE*4,NULL,1,NULL);
 	xTaskCreate(&pulsador1_isr,"pulsador1_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,3,NULL);
-	xTaskCreate(&pulsador2_isr,"pulsador2_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,1,NULL);
+	xTaskCreate(&pulsador2_isr,"pulsador2_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,3,NULL);
 	xTaskCreate(&medicion_temperatura,"medicion_temperatura",configMINIMAL_STACK_SIZE*3,NULL,2,NULL);
 
 	/* ISR service install for the interrupts */
@@ -95,20 +102,21 @@ void app_main(void)
 /* TASKS */
 /* --------------------------------------------------------------------------- */
 /* Tarea del pulsador 1 */
-static void pulsador1_isr(void* pvParameter){
+void pulsador1_isr(void* pvParameter){
 
-	uint32_t io_num;
-	static uint8_t count = 0;
+	uint16_t io_num;
 	control_t *machine = pvParameter;
+	static uint16_t count = 0;
 
 	while(1){
-		if(xQueueReceive(pulsador1_evt_queue, &io_num, portMAX_DELAY)) {
+
+		if(xQueueReceive(pulsador1_evt_queue, &io_num, portMAX_DELAY)){
 			count++;
-			if(machine -> relay == ON && count != 2 && count != 0){
+			if(machine -> relay == ON && count == 1){
 					machine -> relay = OFF;
 					count = 0;
 			}
-			else if(machine -> relay == OFF && count != 2 && count != 0){
+			if(machine -> relay == OFF && count == 1){
 					machine -> relay = ON;
 					count = 0;
 			}
@@ -119,14 +127,14 @@ static void pulsador1_isr(void* pvParameter){
 
 /* Tarea del pulsador 2 */
 
-static void pulsador2_isr(void* pvParameter){
+void pulsador2_isr(void* pvParameter){
 
 	uint32_t io_num;
 	static uint8_t count = 0;
 	control_t *machine = pvParameter;
 
 	while(1){
-		if(xQueueReceive(pulsador2_evt_queue, &io_num, portMAX_DELAY)) {
+		if(xQueueReceive(pulsador2_evt_queue, &io_num, portMAX_DELAY)){
 			count++;
 			if(count == 2 && machine -> modo == AUTOMATIC){
 				if(machine -> timetable == WORK){
@@ -154,10 +162,30 @@ static void pulsador2_isr(void* pvParameter){
 }
 
 /* Tarea de medicion de temperatura */
-static void medicion_temperatura(void* pvParameter){
+void medicion_temperatura(void* pvParameter){
 
-	int16_t temperature = 0;
-	int16_t humidity = 0;
+	hum_temp enviado;
+
+	enviado.temperatura = 0;
+	enviado.humedad = 0;
+
+	while (1){
+
+		if (dht_read_data(sensor_type, dht_gpio, &enviado.humedad, &enviado.temperatura) == ESP_OK){
+
+			xQueueSend(temperature_evt_queue, &enviado,portMAX_DELAY);
+		}
+		vTaskDelay(5000/portTICK_PERIOD_MS);
+	}
+}
+
+
+
+/* @brief Write temperature and humidity on the display
+ *
+ *
+ */
+void DisplayWrite(void* pvParameter){
 
 	char temperatura[] = "Temp:";
 	char humedad[] = "Hum:";
@@ -165,58 +193,43 @@ static void medicion_temperatura(void* pvParameter){
 	char valortemp[1]={0};
 	char valorhum[1]={0};
 
-	while (1){
-		if (dht_read_data(sensor_type, dht_gpio, &humidity, &temperature) == ESP_OK){
-
-			SetCursor(0,2);
-			OledPrint(temperatura);
-			SetCursor(5,2);
-			OledPrint(humedad);
-
-			itoa((temperature*0.1),valortemp,10);
-			SetCursor(3,2);
-			OledPrint(valortemp);
-			itoa((humidity/10),valorhum,10);
-			SetCursor(7,2);
-			OledPrint(valorhum);
-		}
-		vTaskDelay(5000 / portTICK_PERIOD_MS);
-	}
-}
-
-
-
-/* Tarea de Escribir en el display */
-/*static void fsmupdate(void* pvParameter){
-
-	control_t *machine = pvParameter;
+	hum_temp tempyhum;
 
 	while(1){
-		if(xQueueReceive(temperature_evt_queue, &io_num, portMAX_DELAY) == pdTRUE){
 
+		if(xQueueReceive(temperature_evt_queue, &tempyhum, portMAX_DELAY) == pdTRUE){
+
+			SSD1306_GotoXY (0, 10);
+			SSD1306_Puts (temperatura, &Font_7x10, 1);
+			SSD1306_GotoXY (70, 10);
+			SSD1306_Puts (humedad, &Font_7x10, 1);
+			itoa((tempyhum.temperatura*0.1),valortemp,10);
+			SSD1306_GotoXY (35, 10);
+			SSD1306_Puts (valortemp, &Font_7x10, 1);
+			itoa((tempyhum.humedad*0.1),valorhum,10);
+			SSD1306_GotoXY (95, 10);
+			SSD1306_Puts (valorhum, &Font_7x10, 1);
+
+			SSD1306_UpdateScreen();
 		}
-		fsmcontrol(machine);
-		vTaskDelay(1000/portTICK_PERIOD_MS);
 	}
 }
-*/
 
 
 /* Funcion de interrupcion 1 */
-static void IRAM_ATTR gpio_isr_handler1(void* pvParameter)
+void IRAM_ATTR gpio_isr_handler1(void* pvParameter)
 {
-    uint32_t gpio_num1 = (uint32_t) pvParameter;
-    xQueueSendFromISR(pulsador1_evt_queue, &gpio_num1, NULL);
-    vTaskDelay(1/portTICK_PERIOD_MS);
+	uint32_t gpio_num1 = (uint32_t) pvParameter;
+	xQueueSendFromISR(pulsador1_evt_queue, &gpio_num1, NULL);
 }
 
 /* Funcion de interrupcion 2 */
-static void IRAM_ATTR gpio_isr_handler2(void* pvParameter)
+void IRAM_ATTR gpio_isr_handler2(void* pvParameter)
 {
     uint32_t gpio_num2 = (uint32_t) pvParameter;
     xQueueSendFromISR(pulsador2_evt_queue, &gpio_num2, NULL);
-    vTaskDelay(1/portTICK_PERIOD_MS);
 }
+
 
 /* Configuro la estructura gpio_config_t para los
  * pines de ISR */

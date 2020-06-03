@@ -28,13 +28,20 @@ typedef enum{
 	OUTOFWORK
 }timetable_t;
 
+typedef enum{
+	ACTIVATED,
+	DESACTIVATED
+}estado_mov_t;
+
 typedef struct{
 	modo_t modo;
 	estado_relay_t relay;
 	gpio_num_t gpio_relay;
-	uint16_t temperatura;
+	uint16_t temperature;
+	uint16_t humidity;
 	char *nombre;
 	timetable_t timetable;
+	estado_mov_t PIRsensor;
 }control_t;
 
 

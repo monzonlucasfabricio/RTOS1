@@ -5,8 +5,8 @@
  *      Author: lucasml
  */
 
-#include "fsm.h"
 #include "driver_oled.h"
+#include "fsm.h"
 
 char modo_automatico[] = "Modo: Automatico";
 char modo_manual[] = "Modo: Manual";
@@ -31,10 +31,12 @@ void fsminit(control_t *place,uint8_t gpio_relay,char *nombre_lugar){
 	place -> nombre = nombre_lugar;
 	gpio_set_direction((place -> gpio_relay),GPIO_MODE_OUTPUT);
 	gpio_set_pull_mode((place -> gpio_relay),GPIO_PULLUP_ONLY);
-	place -> timetable = WORK;
+	place -> PIRsensor = DESACTIVATED;
+	place -> timetable = OUTOFWORK;
 
-	SetCursor(0,0);
-	OledPrint(nombre_lugar);
+	SSD1306_GotoXY (0, 0);
+	SSD1306_Puts (nombre_lugar, &Font_7x10, 1);
+	SSD1306_UpdateScreen();
 }
 
 /**
@@ -47,17 +49,21 @@ void fsmcontrol(control_t *place){
 
 	case AUTOMATIC:
 	{
-		SetCursor(0,6);
-		OledPrint(borrarpalabra);
-		OledPrint(modo_automatico);
+		SSD1306_GotoXY (0, 53);
+		SSD1306_Puts ("                    ", &Font_7x10, 1);
+		SSD1306_GotoXY (0, 53);
+		SSD1306_Puts (modo_automatico, &Font_7x10, 1);
+		SSD1306_UpdateScreen();
 	}
 	break;
 
 	case MANUAL:
 	{
-		SetCursor(0,6);
-		OledPrint(borrarpalabra);
-		OledPrint(modo_manual);
+		SSD1306_GotoXY (0, 53);
+		SSD1306_Puts ("                    ", &Font_7x10, 1);
+		SSD1306_GotoXY (0, 53);
+		SSD1306_Puts (modo_manual, &Font_7x10, 1);
+		SSD1306_UpdateScreen();
 	}
 	break;
 	}
@@ -67,18 +73,22 @@ void fsmcontrol(control_t *place){
 	case OFF:
 	{
 		gpio_set_level((place -> gpio_relay), 1);
-		SetCursor(4,4);
-		OledPrint(borrarpalabra);
-		OledPrint(luz_apagada);
+		SSD1306_GotoXY (0, 43);
+		SSD1306_Puts ("                    ", &Font_7x10, 1);
+		SSD1306_GotoXY (0, 43);
+		SSD1306_Puts (luz_apagada, &Font_7x10, 1);
+		SSD1306_UpdateScreen();
 	}
 	break;
 
 	case ON:
 	{
 		gpio_set_level((place -> gpio_relay), 0);
-		SetCursor(4,4);
-		OledPrint(borrarpalabra);
-		OledPrint(luz_encendida);
+		SSD1306_GotoXY (0, 43);
+		SSD1306_Puts ("                    ", &Font_7x10, 1);
+		SSD1306_GotoXY (0, 43);
+		SSD1306_Puts (luz_encendida, &Font_7x10, 1);
+		SSD1306_UpdateScreen();
 	}
 	break;
 	}
@@ -87,15 +97,21 @@ void fsmcontrol(control_t *place){
 	switch(place -> timetable){
 	case WORK:
 	{
-		SetCursor(0,4);
-		OledPrint(horario_trabajo);
+		SSD1306_GotoXY (0, 33);
+		SSD1306_Puts ("                    ", &Font_7x10, 1);
+		SSD1306_GotoXY (0, 33);
+		SSD1306_Puts (horario_trabajo, &Font_7x10, 1);
+		SSD1306_UpdateScreen();
 	}
 	break;
 
 	case OUTOFWORK:
 	{
-		SetCursor(0,4);
-		OledPrint(horario_fueradetrabajo);
+		SSD1306_GotoXY (0, 33);
+		SSD1306_Puts ("                    ", &Font_7x10, 1);
+		SSD1306_GotoXY (0, 33);
+		SSD1306_Puts (horario_fueradetrabajo, &Font_7x10, 1);
+		SSD1306_UpdateScreen();
 	}
 	break;
 	}
