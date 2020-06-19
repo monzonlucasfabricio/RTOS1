@@ -128,7 +128,7 @@ void app_main(void)
 									NULL);
 
 	if(res_1 == pdFAIL){
-			printf("Error al crear tarea 1");
+		printf("Error al crear tarea 1");
 	}
 
 	BaseType_t res_2 = xTaskCreate(&pulsador2_isr,
@@ -139,7 +139,7 @@ void app_main(void)
 									NULL);
 
 	if(res_2 == pdFAIL){
-			printf("Error al crear tarea 2");
+		printf("Error al crear tarea 2");
 	}
 
 	BaseType_t res_3 = xTaskCreatePinnedToCore(&medicion_temperatura,
@@ -151,7 +151,7 @@ void app_main(void)
 												1);
 
 	if(res_3 == pdFAIL){
-				printf("Error al crear tarea 3");
+		printf("Error al crear tarea 3");
 	}
 
 	BaseType_t res_4 = xTaskCreatePinnedToCore(&SensorPIR,
@@ -163,8 +163,8 @@ void app_main(void)
 												0);
 
 	if(res_4 == pdFAIL){
-				printf("Error al crear tarea 4");
-		}
+		printf("Error al crear tarea 4");
+	}
 
 
 	/* ISR service install for the interrupts */
