@@ -31,10 +31,13 @@ typedef struct {
 
 /* Finite state machine variable creation and name for the place for the device */
 control_t machine;
-char nombre[] = "----OFICINA2----";
+char nombre[] = "-----OFICINA1-----";
 
 /* Relay pin */
 #define GPIO_NUM_5 5
+
+/* PIR sensor pin */
+#define GPIO_NUM_13 13
 
 /* Temperature sensor type and sensor gpio */
 static const dht_sensor_type_t sensor_type = DHT_TYPE_DHT11;
@@ -50,6 +53,8 @@ static const gpio_num_t dht_gpio = 33;
 static xQueueHandle pulsador1_evt_queue = NULL;
 static xQueueHandle pulsador2_evt_queue = NULL;
 static xQueueHandle temperature_evt_queue = NULL;
+static xQueueHandle PIRsensor_evt_queue = NULL;
+SemaphoreHandle_t xMutex;
 
 /* Tasks prototypes */
 void gpioInit(void);
@@ -57,10 +62,24 @@ void pulsador1_isr(void* pvParameter);
 void pulsador2_isr(void* pvParameter);
 void DisplayWrite(void* pvParameter);
 void medicion_temperatura(void* pvParameter);
+void SensorPIR(void* pvParameter);
 
 /* Synchronization tasks prototypes */
 void IRAM_ATTR gpio_isr_handler1(void* pvParameter);
 void IRAM_ATTR gpio_isr_handler2(void* pvParameter);
+
+/* @brief ISR pin initialization
+ *
+ */
+void gpioInit(void){
+gpio_config_t io_conf;									//!< Config variable
+io_conf.intr_type = GPIO_INTR_POSEDGE;					//!< Interrupt type
+io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;				//!< Pin mask for the config
+io_conf.mode = GPIO_MODE_INPUT;							//!< Interrupt mode
+io_conf.pull_up_en = 1;									//!< Pull up enable
+gpio_config(&io_conf);
+}
+
 
 void app_main(void)
 {
@@ -70,24 +89,26 @@ void app_main(void)
 	gpioInit();								//	Interrupt pin initialization
 
 	SSD1306_GotoXY (0, 32);
-	SSD1306_Puts ("----STARTING----", &Font_7x10, 1);
+	SSD1306_Puts ("-----STARTING-----", &Font_7x10, 1);
 	SSD1306_UpdateScreen();
 
 	vTaskDelay(2000/portTICK_PERIOD_MS);
 	SSD1306_DisplayClear();
-	fsminit(&machine,GPIO_NUM_5,nombre);
+	fsminit(&machine,GPIO_NUM_5,nombre,GPIO_NUM_13);
 	fsmcontrol(&machine);
 
 	/* Queue creations */
 	pulsador1_evt_queue = xQueueCreate(1, sizeof(uint32_t));
 	pulsador2_evt_queue = xQueueCreate(1, sizeof(uint32_t));
 	temperature_evt_queue = xQueueCreate(1, sizeof(hum_temp));
+	PIRsensor_evt_queue = xQueueCreate(3, sizeof(control_t));
 
 	/* Task creations */
-	xTaskCreate(&DisplayWrite,"DisplayWrite",configMINIMAL_STACK_SIZE*4,NULL,1,NULL);
+	xTaskCreate(&DisplayWrite,"DisplayWrite",configMINIMAL_STACK_SIZE*4,&machine,3,NULL);
 	xTaskCreate(&pulsador1_isr,"pulsador1_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,3,NULL);
 	xTaskCreate(&pulsador2_isr,"pulsador2_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,3,NULL);
-	xTaskCreate(&medicion_temperatura,"medicion_temperatura",configMINIMAL_STACK_SIZE*3,NULL,2,NULL);
+	xTaskCreate(&medicion_temperatura,"medicion_temperatura",configMINIMAL_STACK_SIZE*3,NULL,3,NULL);
+	xTaskCreate(&SensorPIR,"SensorPIR",configMINIMAL_STACK_SIZE*2,&machine,3,NULL);
 
 	/* ISR service install for the interrupts */
 	gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
@@ -96,12 +117,19 @@ void app_main(void)
 
 	/* never reach here */
 	for(;;);
+
+	vTaskStartScheduler();
 }
+
+
 
 
 /* TASKS */
 /* --------------------------------------------------------------------------- */
-/* Tarea del pulsador 1 */
+
+/*@brief Button task for machine state mode
+ *@param control_t struct
+ */
 void pulsador1_isr(void* pvParameter){
 
 	uint16_t io_num;
@@ -125,7 +153,12 @@ void pulsador1_isr(void* pvParameter){
 	}
 }
 
-/* Tarea del pulsador 2 */
+
+
+
+/*@brief Button task for machine state mode
+ *@param control_t struct
+ */
 
 void pulsador2_isr(void* pvParameter){
 
@@ -140,28 +173,36 @@ void pulsador2_isr(void* pvParameter){
 				if(machine -> timetable == WORK){
 					machine -> modo = MANUAL;
 					count = 0;
+					fsmcontrol(machine);
 				}
 				else if(machine -> timetable == OUTOFWORK){
 					machine -> modo = AUTOMATIC;
 					count = 0;
+					fsmcontrol(machine);
 				}
 			}
 			else if(count == 2 && machine -> modo == MANUAL){
 				if(machine -> timetable == WORK){
 					machine -> modo = AUTOMATIC;
 					count = 0;
+					fsmcontrol(machine);
 				}
 				else if(machine -> timetable == OUTOFWORK){
 					machine -> modo = AUTOMATIC;
 					count = 0;
+					fsmcontrol(machine);
 				}
 			}
-			fsmcontrol(machine);
 		}
 	}
 }
 
-/* Tarea de medicion de temperatura */
+
+
+
+/*@brief Temperature measurement task
+ *@param none
+ */
 void medicion_temperatura(void* pvParameter){
 
 	hum_temp enviado;
@@ -175,15 +216,16 @@ void medicion_temperatura(void* pvParameter){
 
 			xQueueSend(temperature_evt_queue, &enviado,portMAX_DELAY);
 		}
-		vTaskDelay(5000/portTICK_PERIOD_MS);
+		vTaskDelay(2000/portTICK_PERIOD_MS);
 	}
 }
 
 
 
-/* @brief Write temperature and humidity on the display
- *
- *
+
+/**
+ * @brief SSD1306 data buffer
+ * @note  This buffer will take the data to write on the display RAM
  */
 void DisplayWrite(void* pvParameter){
 
@@ -194,51 +236,81 @@ void DisplayWrite(void* pvParameter){
 	char valorhum[1]={0};
 
 	hum_temp tempyhum;
+	control_t *machine = pvParameter;
+
+	xMutex = xSemaphoreCreateMutex();
 
 	while(1){
+		if( xMutex != NULL){
 
-		if(xQueueReceive(temperature_evt_queue, &tempyhum, portMAX_DELAY) == pdTRUE){
+			if( xSemaphoreTake (xMutex, ( TickType_t ) 5) == pdTRUE ){
 
-			SSD1306_GotoXY (0, 10);
-			SSD1306_Puts (temperatura, &Font_7x10, 1);
-			SSD1306_GotoXY (70, 10);
-			SSD1306_Puts (humedad, &Font_7x10, 1);
-			itoa((tempyhum.temperatura*0.1),valortemp,10);
-			SSD1306_GotoXY (35, 10);
-			SSD1306_Puts (valortemp, &Font_7x10, 1);
-			itoa((tempyhum.humedad*0.1),valorhum,10);
-			SSD1306_GotoXY (95, 10);
-			SSD1306_Puts (valorhum, &Font_7x10, 1);
+				fsmcontrol(machine);
 
-			SSD1306_UpdateScreen();
+				if(xQueueReceive(temperature_evt_queue, &tempyhum, portMAX_DELAY) == pdTRUE){
+
+					SSD1306_GotoXY (0, 10);
+					SSD1306_Puts (temperatura, &Font_7x10, 1);
+					SSD1306_GotoXY (81, 10);
+					SSD1306_Puts (humedad, &Font_7x10, 1);
+					itoa((tempyhum.temperatura*0.1),valortemp,10);
+					SSD1306_GotoXY (35, 10);
+					SSD1306_Puts (valortemp, &Font_7x10, 1);
+					itoa((tempyhum.humedad*0.1),valorhum,10);
+					SSD1306_GotoXY (110, 10);
+					SSD1306_Puts (valorhum, &Font_7x10, 1);
+					SSD1306_UpdateScreen();
+
+				}
+
+				xSemaphoreGive( xMutex );
+			}
 		}
 	}
 }
 
 
-/* Funcion de interrupcion 1 */
+
+
+/*@brief PIR sensor task
+ *@param control_t struct
+ */
+void SensorPIR(void* pvParameter){
+
+	control_t *machine = pvParameter;
+
+	while(1){
+		if(gpio_get_level(machine -> gpio_PIR) == 1){
+			machine -> PIRsensor = ACTIVATED;						//!< Activate PIR SENSOR
+		}
+		else if(gpio_get_level(machine -> gpio_PIR) == 0){
+			machine -> PIRsensor = DESACTIVATED;					//!< Deactivate PIR SENSOR
+		}
+		vTaskDelay(1000/portTICK_PERIOD_MS);
+	}
+}
+
+
+
+
+
+/*@brief Interrupt function N1
+ *
+ */
 void IRAM_ATTR gpio_isr_handler1(void* pvParameter)
 {
 	uint32_t gpio_num1 = (uint32_t) pvParameter;
 	xQueueSendFromISR(pulsador1_evt_queue, &gpio_num1, NULL);
 }
 
-/* Funcion de interrupcion 2 */
+
+
+
+/*@brief Interrupt function N2
+ *
+ */
 void IRAM_ATTR gpio_isr_handler2(void* pvParameter)
 {
     uint32_t gpio_num2 = (uint32_t) pvParameter;
     xQueueSendFromISR(pulsador2_evt_queue, &gpio_num2, NULL);
 }
-
-
-/* Configuro la estructura gpio_config_t para los
- * pines de ISR */
-void gpioInit(void){
-gpio_config_t io_conf;									/* Defino una variable de configuracion*/
-io_conf.intr_type = GPIO_INTR_POSEDGE;					/* Defino el flanco */
-io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;				/* Defino la mascara con los pines van a tener la misma configuracion */
-io_conf.mode = GPIO_MODE_INPUT;							/* Defino direccion */
-io_conf.pull_up_en = 1;									/* Defino el pin como pull-up */
-gpio_config(&io_conf);									/* Le doy el puntero a la funcion gpio_config(const gpio_config_t *pGPIOConfig) */
-}
-

@@ -92,7 +92,7 @@ char SSD1306_Putc(char ch, FontDef_t* Font, SSD1306_COLOR_t color){
 
 	uint32_t i, b, j;
 
-	/* Check available space in LCD */
+	/* Check available space on Display */
 	if (
 			SSD1306_WIDTH <= (SSD1306.CurrentX + Font->FontWidth) ||
 			SSD1306_HEIGHT <= (SSD1306.CurrentY + Font->FontHeight)
@@ -146,20 +146,18 @@ void SSD1306_DrawPixel(uint16_t x, uint16_t y, SSD1306_COLOR_t color) {
 
 	/* Set color */
 	if (color == SSD1306_COLOR_WHITE) {
-		SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] |= 1 << (y % 8);  //!< Assign a 1 to the position an then shift the result of y%8 times
+		SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] |= 1 << (y % 8);
 	} else {
 		SSD1306_Buffer[x + (y / 8) * SSD1306_WIDTH] &= ~(1 << (y % 8));
 	}
 
-	/* Example for x = 10, y = 2;
+	/* Example
 	 *
-	 * SSD1306_Buffer[10 + (y/8)*128] = SSD1306_Buffer[42]
-	 * 2 % 8 = 2
-	 *
-	 *
+	 * SSD1306_Buffer[50 + (3 / 8) * 128] |= 1 << (3);
+	 * SSD1306_Buffer[98] |= 1 << (3);
+	 * SSD1306_Buffer[98] = 00001000;
 	 *
 	 */
-
 }
 
 void SSD1306_DisplayInit(void) {

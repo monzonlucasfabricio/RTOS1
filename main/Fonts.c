@@ -5,8 +5,9 @@
  *      Author: lucasml
  */
 
+#include "inc/Fonts.h"
+
 #include <stdint.h>
-#include "font8x8_basic.h"
 
 const uint16_t Font7x10 [] = {
 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000, 0x0000,  // sp

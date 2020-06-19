@@ -42,10 +42,11 @@ typedef struct{
 	char *nombre;
 	timetable_t timetable;
 	estado_mov_t PIRsensor;
+	gpio_num_t gpio_PIR;
 }control_t;
 
 
-void fsminit(control_t *place,uint8_t gpio_relay,char *nombre_lugar);
+void fsminit(control_t *place,uint8_t gpio_relay,char *nombre_lugar,uint8_t gpio_PIR);
 void fsmcontrol(control_t *place);
 
 #endif /* MAIN_INC_FSM_H_ */

@@ -3,11 +3,11 @@
 
 #include <string.h>
 #include <stdbool.h>
-#include "font8x8_basic.h"
 #include "driver/i2c.h"
 #include "driver/gpio.h"
 #include "esp_err.h"
 #include "esp_log.h"
+#include "Fonts.h"
 
 // SLA (0x3C) + WRITE_MODE (0x00) =  0x78 (0b01111000)
 #define OLED_I2C_ADDRESS   0x3C
@@ -47,10 +47,6 @@
 
 // Charge Pump (pg.62)
 #define OLED_CMD_SET_CHARGE_PUMP        0x8D    // follow with 0x14
-
-/* SDA and SCL pins to be used */
-#define SDA_PIN GPIO_NUM_15
-#define SCL_PIN GPIO_NUM_2
 
 /* SSD1306 settings */
 /* SSD1306 width in pixels */
