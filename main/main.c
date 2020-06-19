@@ -103,22 +103,81 @@ void app_main(void)
 	temperature_evt_queue = xQueueCreate(1, sizeof(hum_temp));
 	PIRsensor_evt_queue = xQueueCreate(3, sizeof(control_t));
 
+	if((pulsador1_evt_queue == NULL) || (pulsador2_evt_queue == NULL) || (temperature_evt_queue == NULL) || (PIRsensor_evt_queue == NULL))
+		{
+			printf("Error al crear colas");
+		}
+
 	/* Task creations */
-	xTaskCreate(&DisplayWrite,"DisplayWrite",configMINIMAL_STACK_SIZE*4,&machine,3,NULL);
-	xTaskCreate(&pulsador1_isr,"pulsador1_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,3,NULL);
-	xTaskCreate(&pulsador2_isr,"pulsador2_isr",configMINIMAL_STACK_SIZE*4,(void*)&machine,3,NULL);
-	xTaskCreate(&medicion_temperatura,"medicion_temperatura",configMINIMAL_STACK_SIZE*3,NULL,3,NULL);
-	xTaskCreate(&SensorPIR,"SensorPIR",configMINIMAL_STACK_SIZE*2,&machine,3,NULL);
+	BaseType_t res_0 = xTaskCreate(&DisplayWrite,
+								"DisplayWrite",
+								configMINIMAL_STACK_SIZE*4,
+								&machine,
+								3,
+								NULL);
+
+	if(res_0 == pdFAIL){
+		printf("Error al crear tarea");
+	}
+
+	BaseType_t res_1 = xTaskCreate(&pulsador1_isr,
+									"pulsador1_isr",
+									configMINIMAL_STACK_SIZE*4,
+									(void*)&machine,
+									3,
+									NULL);
+
+	if(res_1 == pdFAIL){
+			printf("Error al crear tarea 1");
+	}
+
+	BaseType_t res_2 = xTaskCreate(&pulsador2_isr,
+									"pulsador2_isr",
+									configMINIMAL_STACK_SIZE*4,
+									(void*)&machine,
+									3,
+									NULL);
+
+	if(res_2 == pdFAIL){
+			printf("Error al crear tarea 2");
+	}
+
+	BaseType_t res_3 = xTaskCreatePinnedToCore(&medicion_temperatura,
+												"medicion_temperatura",
+												configMINIMAL_STACK_SIZE*3,
+												NULL,
+												3,
+												NULL,
+												1);
+
+	if(res_3 == pdFAIL){
+				printf("Error al crear tarea 3");
+	}
+
+	BaseType_t res_4 = xTaskCreatePinnedToCore(&SensorPIR,
+												"SensorPIR",
+												configMINIMAL_STACK_SIZE*2,
+												&machine,
+												3,
+												NULL,
+												0);
+
+	if(res_4 == pdFAIL){
+				printf("Error al crear tarea 4");
+		}
+
 
 	/* ISR service install for the interrupts */
 	gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
 	gpio_isr_handler_add(GPIO_PULSADOR1, gpio_isr_handler1, (void*) GPIO_PULSADOR1);
 	gpio_isr_handler_add(GPIO_PULSADOR2, gpio_isr_handler2, (void*) GPIO_PULSADOR2);
 
-	/* never reach here */
-	for(;;);
 
-	vTaskStartScheduler();
+	/* never reach here */
+	while(true){
+
+	}
+
 }
 
 
@@ -126,6 +185,27 @@ void app_main(void)
 
 /* TASKS */
 /* --------------------------------------------------------------------------- */
+
+
+/*@brief Interrupt function N1
+ *
+ */
+void IRAM_ATTR gpio_isr_handler1(void* pvParameter)
+{
+	uint32_t gpio_num1 = (uint32_t) pvParameter;
+	xQueueSendFromISR(pulsador1_evt_queue, &gpio_num1, NULL);
+}
+
+
+
+/*@brief Interrupt function N2
+ *
+ */
+void IRAM_ATTR gpio_isr_handler2(void* pvParameter)
+{
+    uint32_t gpio_num2 = (uint32_t) pvParameter;
+    xQueueSendFromISR(pulsador2_evt_queue, &gpio_num2, NULL);
+}
 
 /*@brief Button task for machine state mode
  *@param control_t struct
@@ -139,6 +219,7 @@ void pulsador1_isr(void* pvParameter){
 	while(1){
 
 		if(xQueueReceive(pulsador1_evt_queue, &io_num, portMAX_DELAY)){
+			printf("Relay button pressed\r\n");
 			count++;
 			if(machine -> relay == ON && count == 1){
 					machine -> relay = OFF;
@@ -168,6 +249,7 @@ void pulsador2_isr(void* pvParameter){
 
 	while(1){
 		if(xQueueReceive(pulsador2_evt_queue, &io_num, portMAX_DELAY)){
+			printf("Mode button pressed\r\n");
 			count++;
 			if(count == 2 && machine -> modo == AUTOMATIC){
 				if(machine -> timetable == WORK){
@@ -214,6 +296,7 @@ void medicion_temperatura(void* pvParameter){
 
 		if (dht_read_data(sensor_type, dht_gpio, &enviado.humedad, &enviado.temperatura) == ESP_OK){
 
+			printf("Temperature and humidity sensor was read\r\n");
 			xQueueSend(temperature_evt_queue, &enviado,portMAX_DELAY);
 		}
 		vTaskDelay(2000/portTICK_PERIOD_MS);
@@ -225,7 +308,7 @@ void medicion_temperatura(void* pvParameter){
 
 /**
  * @brief SSD1306 data buffer
- * @note  This buffer will take the data to write on the display RAM
+ * @note  This buffer will take the data to write on the display static RAM
  */
 void DisplayWrite(void* pvParameter){
 
@@ -249,6 +332,8 @@ void DisplayWrite(void* pvParameter){
 
 				if(xQueueReceive(temperature_evt_queue, &tempyhum, portMAX_DELAY) == pdTRUE){
 
+					printf("Write temperature and humidity on display\r\n");
+
 					SSD1306_GotoXY (0, 10);
 					SSD1306_Puts (temperatura, &Font_7x10, 1);
 					SSD1306_GotoXY (81, 10);
@@ -260,6 +345,8 @@ void DisplayWrite(void* pvParameter){
 					SSD1306_GotoXY (110, 10);
 					SSD1306_Puts (valorhum, &Font_7x10, 1);
 					SSD1306_UpdateScreen();
+
+					printf("UpdateScreen");
 
 				}
 
@@ -290,27 +377,3 @@ void SensorPIR(void* pvParameter){
 	}
 }
 
-
-
-
-
-/*@brief Interrupt function N1
- *
- */
-void IRAM_ATTR gpio_isr_handler1(void* pvParameter)
-{
-	uint32_t gpio_num1 = (uint32_t) pvParameter;
-	xQueueSendFromISR(pulsador1_evt_queue, &gpio_num1, NULL);
-}
-
-
-
-
-/*@brief Interrupt function N2
- *
- */
-void IRAM_ATTR gpio_isr_handler2(void* pvParameter)
-{
-    uint32_t gpio_num2 = (uint32_t) pvParameter;
-    xQueueSendFromISR(pulsador2_evt_queue, &gpio_num2, NULL);
-}
