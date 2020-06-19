@@ -122,22 +122,24 @@ void app_main(void)
 		printf("Error al crear tarea");
 	}
 
+
 	BaseType_t res_1 = xTaskCreate(&pulsador1_isr,
 			"pulsador1_isr",
 			configMINIMAL_STACK_SIZE*4,
 			(void*)&machine,
-			3,
+			4,
 			NULL);
 
 	if(res_1 == pdFAIL){
 		printf("Error al crear tarea 1");
 	}
 
+
 	BaseType_t res_2 = xTaskCreate(&pulsador2_isr,
 			"pulsador2_isr",
 			configMINIMAL_STACK_SIZE*4,
 			(void*)&machine,
-			3,
+			4,
 			NULL);
 
 	if(res_2 == pdFAIL){
@@ -221,20 +223,30 @@ void pulsador1_isr(void* pvParameter){
 	while(1){
 
 		if(xQueueReceive(pulsador1_evt_queue, &io_num, portMAX_DELAY)){
+
 			count++;
 			if(machine -> relay == ON && count == 1){
-					machine -> relay = OFF;
-					count = 0;
+				machine -> relay = OFF;
+				count = 0;
 			}
-			if(machine -> relay == OFF && count == 1){
-					machine -> relay = ON;
-					count = 0;
+
+			else if(machine -> relay == OFF && count == 1){
+				machine -> relay = ON;
+				count = 0;
 			}
-			fsmcontrol(machine);
+
+			else if(machine -> relay == ON && count > 1){
+				count = 0;
+				vTaskDelay(400/portTICK_PERIOD_MS);
+			}
+
+			else if(machine -> relay == OFF && count > 1){
+				count = 0;
+				vTaskDelay(400/portTICK_PERIOD_MS);
+			}
 		}
 	}
 }
-
 
 
 
@@ -245,34 +257,30 @@ void pulsador1_isr(void* pvParameter){
 void pulsador2_isr(void* pvParameter){
 
 	uint32_t io_num;
-	static uint8_t count = 0;
+	static uint8_t count1 = 0;
 	control_t *machine = pvParameter;
 
 	while(1){
 		if(xQueueReceive(pulsador2_evt_queue, &io_num, portMAX_DELAY)){
-			count++;
-			if(count == 2 && machine -> modo == AUTOMATIC){
+			count1++;
+			if(count1 == 2 && machine -> modo == AUTOMATIC){
 				if(machine -> timetable == WORK){
 					machine -> modo = MANUAL;
-					count = 0;
-					fsmcontrol(machine);
+					count1 = 0;
 				}
 				else if(machine -> timetable == OUTOFWORK){
 					machine -> modo = AUTOMATIC;
-					count = 0;
-					fsmcontrol(machine);
+					count1 = 0;
 				}
 			}
-			else if(count == 2 && machine -> modo == MANUAL){
+			else if(count1 == 2 && machine -> modo == MANUAL){
 				if(machine -> timetable == WORK){
 					machine -> modo = AUTOMATIC;
-					count = 0;
-					fsmcontrol(machine);
+					count1 = 0;
 				}
 				else if(machine -> timetable == OUTOFWORK){
 					machine -> modo = AUTOMATIC;
-					count = 0;
-					fsmcontrol(machine);
+					count1 = 0;
 				}
 			}
 		}
@@ -298,7 +306,7 @@ void medicion_temperatura(void* pvParameter){
 
 			xQueueSend(temperature_evt_queue, &enviado,portMAX_DELAY);
 		}
-		vTaskDelay(2000/portTICK_PERIOD_MS);
+		vTaskDelay(1000/portTICK_PERIOD_MS);
 	}
 }
 

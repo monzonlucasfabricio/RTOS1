@@ -38,6 +38,8 @@ void fsminit(control_t *place,uint8_t gpio_relay,char *nombre_lugar,uint8_t gpio
 	place -> gpio_PIR = gpio_PIR;
 	gpio_set_direction((place -> gpio_PIR),GPIO_MODE_INPUT);
 
+	gpio_set_level ((place -> gpio_relay),1);
+
 
 	SSD1306_GotoXY (0, 0);
 	SSD1306_Puts (nombre_lugar, &Font_7x10, 1);
