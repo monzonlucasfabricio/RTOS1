@@ -110,57 +110,57 @@ void app_main(void)
 
 	/* Task creations */
 	BaseType_t res_0 = xTaskCreate(&DisplayWrite,
-								"DisplayWrite",
-								configMINIMAL_STACK_SIZE*4,
-								&machine,
-								3,
-								NULL);
+			"DisplayWrite",
+			configMINIMAL_STACK_SIZE*4,
+			&machine,
+			3,
+			NULL);
 
 	if(res_0 == pdFAIL){
 		printf("Error al crear tarea");
 	}
 
 	BaseType_t res_1 = xTaskCreate(&pulsador1_isr,
-									"pulsador1_isr",
-									configMINIMAL_STACK_SIZE*4,
-									(void*)&machine,
-									3,
-									NULL);
+			"pulsador1_isr",
+			configMINIMAL_STACK_SIZE*4,
+			(void*)&machine,
+			3,
+			NULL);
 
 	if(res_1 == pdFAIL){
 		printf("Error al crear tarea 1");
 	}
 
 	BaseType_t res_2 = xTaskCreate(&pulsador2_isr,
-									"pulsador2_isr",
-									configMINIMAL_STACK_SIZE*4,
-									(void*)&machine,
-									3,
-									NULL);
+			"pulsador2_isr",
+			configMINIMAL_STACK_SIZE*4,
+			(void*)&machine,
+			3,
+			NULL);
 
 	if(res_2 == pdFAIL){
 		printf("Error al crear tarea 2");
 	}
 
 	BaseType_t res_3 = xTaskCreatePinnedToCore(&medicion_temperatura,
-												"medicion_temperatura",
-												configMINIMAL_STACK_SIZE*3,
-												NULL,
-												3,
-												NULL,
-												1);
+			"medicion_temperatura",
+			configMINIMAL_STACK_SIZE*3,
+			NULL,
+			3,
+			NULL,
+			1);
 
 	if(res_3 == pdFAIL){
 		printf("Error al crear tarea 3");
 	}
 
 	BaseType_t res_4 = xTaskCreatePinnedToCore(&SensorPIR,
-												"SensorPIR",
-												configMINIMAL_STACK_SIZE*2,
-												&machine,
-												3,
-												NULL,
-												0);
+			"SensorPIR",
+			configMINIMAL_STACK_SIZE*2,
+			&machine,
+			3,
+			NULL,
+			0);
 
 	if(res_4 == pdFAIL){
 		printf("Error al crear tarea 4");
