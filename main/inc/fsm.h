@@ -30,7 +30,7 @@ typedef enum{
 
 typedef enum{
 	ACTIVATED,
-	DESACTIVATED
+	DEACTIVATED
 }estado_mov_t;
 
 typedef struct{

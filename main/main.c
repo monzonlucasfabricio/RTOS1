@@ -29,7 +29,7 @@ typedef struct {
 	int16_t humedad;
 }hum_temp;
 
-/* Finite state machine variable creation and name for the place for the device */
+/* Finite state machine variable creation and name of the place for the device */
 control_t machine;
 char nombre[] = "-----OFICINA1-----";
 
@@ -54,6 +54,8 @@ static xQueueHandle pulsador1_evt_queue = NULL;
 static xQueueHandle pulsador2_evt_queue = NULL;
 static xQueueHandle temperature_evt_queue = NULL;
 static xQueueHandle PIRsensor_evt_queue = NULL;
+
+/* Semaphore Handler */
 SemaphoreHandle_t xMutex;
 
 /* Tasks prototypes */
@@ -219,7 +221,6 @@ void pulsador1_isr(void* pvParameter){
 	while(1){
 
 		if(xQueueReceive(pulsador1_evt_queue, &io_num, portMAX_DELAY)){
-			printf("Relay button pressed\r\n");
 			count++;
 			if(machine -> relay == ON && count == 1){
 					machine -> relay = OFF;
@@ -249,7 +250,6 @@ void pulsador2_isr(void* pvParameter){
 
 	while(1){
 		if(xQueueReceive(pulsador2_evt_queue, &io_num, portMAX_DELAY)){
-			printf("Mode button pressed\r\n");
 			count++;
 			if(count == 2 && machine -> modo == AUTOMATIC){
 				if(machine -> timetable == WORK){
@@ -296,7 +296,6 @@ void medicion_temperatura(void* pvParameter){
 
 		if (dht_read_data(sensor_type, dht_gpio, &enviado.humedad, &enviado.temperatura) == ESP_OK){
 
-			printf("Temperature and humidity sensor was read\r\n");
 			xQueueSend(temperature_evt_queue, &enviado,portMAX_DELAY);
 		}
 		vTaskDelay(2000/portTICK_PERIOD_MS);
@@ -332,8 +331,6 @@ void DisplayWrite(void* pvParameter){
 
 				if(xQueueReceive(temperature_evt_queue, &tempyhum, portMAX_DELAY) == pdTRUE){
 
-					printf("Write temperature and humidity on display\r\n");
-
 					SSD1306_GotoXY (0, 10);
 					SSD1306_Puts (temperatura, &Font_7x10, 1);
 					SSD1306_GotoXY (81, 10);
@@ -345,8 +342,6 @@ void DisplayWrite(void* pvParameter){
 					SSD1306_GotoXY (110, 10);
 					SSD1306_Puts (valorhum, &Font_7x10, 1);
 					SSD1306_UpdateScreen();
-
-					printf("UpdateScreen");
 
 				}
 
@@ -371,7 +366,7 @@ void SensorPIR(void* pvParameter){
 			machine -> PIRsensor = ACTIVATED;						//!< Activate PIR SENSOR
 		}
 		else if(gpio_get_level(machine -> gpio_PIR) == 0){
-			machine -> PIRsensor = DESACTIVATED;					//!< Deactivate PIR SENSOR
+			machine -> PIRsensor = DEACTIVATED;					//!< Deactivate PIR SENSOR
 		}
 		vTaskDelay(1000/portTICK_PERIOD_MS);
 	}

@@ -33,7 +33,7 @@ void fsminit(control_t *place,uint8_t gpio_relay,char *nombre_lugar,uint8_t gpio
 	place -> nombre = nombre_lugar;
 	gpio_set_direction((place -> gpio_relay),GPIO_MODE_OUTPUT);
 	gpio_set_pull_mode((place -> gpio_relay),GPIO_PULLUP_ONLY);
-	place -> PIRsensor = DESACTIVATED;
+	place -> PIRsensor = DEACTIVATED;
 	place -> timetable = WORK;
 	place -> gpio_PIR = gpio_PIR;
 	gpio_set_direction((place -> gpio_PIR),GPIO_MODE_INPUT);
@@ -122,7 +122,7 @@ void fsmcontrol(control_t *place){
 	}
 
 	switch(place -> PIRsensor){
-	case DESACTIVATED:
+	case DEACTIVATED:
 	{
 		SSD1306_GotoXY (0, 20);
 		SSD1306_Puts ("                    ", &Font_7x10, 1);
